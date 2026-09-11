@@ -1,0 +1,478 @@
+# Patrones de Diseño de Software — Sintaxis y Documentación (Java)
+
+---
+
+## 1. Singleton
+
+**Qué resuelve:** garantizar que una clase tenga **una sola instancia** en toda la aplicación (ej: conexión a base de datos, configuración global).
+
+```java
+public class Singleton {
+    private static Singleton instancia;       // (1)
+    private String valor;
+
+    private Singleton(String valor) {          // (2)
+        this.valor = valor;
+    }
+
+    public static Singleton getInstancia(String valor) {
+        if (instancia == null) {                // (3)
+            instancia = new Singleton(valor);
+        }
+        return instancia;                       // (4)
+    }
+}
+```
+
+**Documentación de cada parte:**
+- **(1) `instancia`**: variable estática (de clase) que guarda la única instancia. Al inicio es `null`.
+- **(2) constructor `private`**: impide que otras clases hagan `new Singleton(...)` directamente.
+- **(3) `if (instancia == null)`**: solo crea el objeto la primera vez que se pide.
+- **(4) `return instancia`**: siempre devuelve la misma referencia.
+
+**Qué puedes cambiar:**
+- Si trabajas con múltiples hilos, agrega `synchronized` al método `getInstancia` (o usa un bloque `synchronized` interno) para evitar que dos hilos creen dos instancias a la vez.
+- Los atributos (`valor`) los adaptas a lo que realmente necesites compartir (ej: conexión, configuración).
+
+---
+
+## 2. Factory Method
+
+**Qué resuelve:** delegar la creación de objetos a subclases, sin que el código cliente sepa la clase exacta que se instancia.
+
+```java
+interface Transporte {                        // (1)
+    String entregar();
+}
+
+class Camion implements Transporte {
+    public String entregar() { return "Entrega por carretera"; }
+}
+
+class Barco implements Transporte {
+    public String entregar() { return "Entrega por mar"; }
+}
+
+abstract class Logistica {                     // (2)
+    abstract Transporte crearTransporte();     // (3)
+}
+
+class LogisticaTerrestre extends Logistica {
+    Transporte crearTransporte() {
+        return new Camion();                   // (4)
+    }
+}
+
+class LogisticaMaritima extends Logistica {
+    Transporte crearTransporte() {
+        return new Barco();
+    }
+}
+```
+
+**Documentación de cada parte:**
+- **(1) `Transporte`**: interfaz que define qué deben poder hacer todos los productos.
+- **(2) `Logistica`**: clase abstracta creadora, base para las fábricas concretas.
+- **(3) `crearTransporte()`**: método abstracto que cada subclase debe implementar.
+- **(4) `return new Camion()`**: cada subclase decide qué producto concreto entrega.
+
+**Qué puedes cambiar:**
+- Agrega nuevos productos creando nuevas clases que implementen `Transporte` (ej: `Avion`).
+- Agrega nuevas fábricas extendiendo `Logistica` sin tocar el código existente.
+- El nombre del método (`crearTransporte`) debe coincidir en todas las subclases.
+
+---
+
+## 3. Abstract Factory
+
+**Qué resuelve:** crear **familias completas** de objetos relacionados sin especificar sus clases concretas.
+
+```java
+interface Boton {                              // (1) producto abstracto
+    String render();
+}
+
+class BotonWindows implements Boton {
+    public String render() { return "Botón estilo Windows"; }
+}
+
+class BotonMac implements Boton {
+    public String render() { return "Botón estilo Mac"; }
+}
+
+interface FabricaGUI {                         // (2) fábrica abstracta
+    Boton crearBoton();
+}
+
+class FabricaWindows implements FabricaGUI {   // (3) fábrica concreta
+    public Boton crearBoton() { return new BotonWindows(); }
+}
+
+class FabricaMac implements FabricaGUI {
+    public Boton crearBoton() { return new BotonMac(); }
+}
+```
+
+**Documentación de cada parte:**
+- **(1) `Boton`**: interfaz común de un tipo de producto (puede haber varias, ej: `Boton`, `Ventana`, `Menu`).
+- **(2) `FabricaGUI`**: interfaz que agrupa la creación de toda una familia de productos relacionados.
+- **(3) `FabricaWindows`**: implementación concreta que garantiza coherencia entre los productos que crea (todos "Windows" o todos "Mac").
+
+**Qué puedes cambiar:**
+- Si agregas una nueva familia (ej: `BotonLinux`), debes crear también `FabricaLinux implements FabricaGUI`.
+- Si agregas un nuevo tipo de producto (ej: `Ventana`), debes añadir el método correspondiente a **todas** las fábricas.
+
+---
+
+## 4. Builder
+
+**Qué resuelve:** construir objetos complejos paso a paso, separando la construcción de la representación final.
+
+```java
+class Casa {                                   // (1) producto final
+    String paredes;
+    String techo;
+    boolean piscina;
+}
+
+class ConstructorCasa {                        // (2)
+    private Casa casa = new Casa();
+
+    public ConstructorCasa ponerParedes(String tipo) {   // (3)
+        casa.paredes = tipo;
+        return this;                            // (4)
+    }
+
+    public ConstructorCasa ponerTecho(String tipo) {
+        casa.techo = tipo;
+        return this;
+    }
+
+    public ConstructorCasa agregarPiscina() {
+        casa.piscina = true;
+        return this;
+    }
+
+    public Casa construir() {                  // (5)
+        return casa;
+    }
+}
+```
+
+Uso:
+```java
+Casa casa = new ConstructorCasa()
+        .ponerParedes("ladrillo")
+        .ponerTecho("teja")
+        .agregarPiscina()
+        .construir();
+```
+
+**Documentación de cada parte:**
+- **(1) `Casa`**: el objeto final que se quiere construir, con varias partes opcionales.
+- **(2) `ConstructorCasa`**: mantiene una instancia del producto en construcción.
+- **(3) `ponerParedes(...)`**: cada método configura una parte específica del objeto.
+- **(4) `return this`**: permite encadenar llamadas (*method chaining*).
+- **(5) `construir()`**: devuelve el objeto final ya armado.
+
+**Qué puedes cambiar:**
+- Agrega nuevos métodos `ponerX` para nuevas partes del producto.
+- Puedes crear una clase "Director" que use el Builder con secuencias predefinidas (ej: `construirCasaLujo()`).
+
+---
+
+## 5. Prototype
+
+**Qué resuelve:** crear nuevos objetos copiando (clonando) una instancia existente, en lugar de construirla desde cero.
+
+```java
+class Documento implements Cloneable {         // (1)
+    String contenido;
+    String formato;
+
+    Documento(String contenido, String formato) {
+        this.contenido = contenido;
+        this.formato = formato;
+    }
+
+    @Override
+    public Documento clone() {                 // (2)
+        try {
+            return (Documento) super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+}
+```
+
+Uso:
+```java
+Documento original = new Documento("Texto base", "PDF");
+Documento copia = original.clone();
+copia.contenido = "Texto modificado";          // (3)
+```
+
+**Documentación de cada parte:**
+- **(1) `implements Cloneable`**: marca la clase como "clonable"; es obligatorio para poder usar `super.clone()`.
+- **(2) `clone()`**: sobrescribe el método heredado de `Object`; aquí controlas qué se copia.
+- **(3)** la copia se modifica sin afectar al objeto original.
+
+**Qué puedes cambiar:**
+- Por defecto `super.clone()` hace una copia **superficial** (shallow copy): si `Documento` tuviera una lista u otro objeto interno, ambas instancias compartirían la misma referencia. Si necesitas copia profunda, debes clonar manualmente esos atributos dentro de `clone()`.
+- Puedes excluir atributos de la copia (ej: un `id` único) asignándolos manualmente después de clonar.
+
+---
+
+## 6. Adapter
+
+**Qué resuelve:** hacer compatibles dos interfaces que de otra forma no podrían trabajar juntas.
+
+```java
+interface ReproductorMP3 {                     // (1) lo que el cliente espera usar
+    String reproducirMp3(String archivo);
+}
+
+class ReproductorMP4Antiguo {                  // (2) clase incompatible existente
+    String playMp4Legacy(String file) {
+        return "Reproduciendo MP4 (legacy): " + file;
+    }
+}
+
+class AdaptadorMP4 implements ReproductorMP3 { // (3)
+    private ReproductorMP4Antiguo reproductorMp4;
+
+    AdaptadorMP4(ReproductorMP4Antiguo reproductorMp4) {
+        this.reproductorMp4 = reproductorMp4;
+    }
+
+    public String reproducirMp3(String archivo) {  // (4)
+        return reproductorMp4.playMp4Legacy(archivo);
+    }
+}
+```
+
+**Documentación de cada parte:**
+- **(1) `ReproductorMP3`**: la interfaz que el resto del sistema ya sabe usar.
+- **(2) `ReproductorMP4Antiguo`**: clase externa/antigua con una interfaz distinta e incompatible que no se puede modificar.
+- **(3) `AdaptadorMP4`**: implementa la interfaz esperada y "traduce" las llamadas.
+- **(4) `reproducirMp3(...)`**: internamente traduce la llamada al método real de la clase incompatible.
+
+**Qué puedes cambiar:**
+- El adaptador puede envolver cualquier clase incompatible; solo cambia qué método interno llama.
+- Si tienes varias clases legacy distintas, creas un adaptador por cada una.
+
+---
+
+## 7. Decorator
+
+**Qué resuelve:** añadir funcionalidades a un objeto **dinámicamente**, sin modificar su clase ni usar herencia rígida.
+
+```java
+interface Cafe {                               // (1)
+    int costo();
+}
+
+class CafeSimple implements Cafe {
+    public int costo() { return 5000; }
+}
+
+abstract class DecoradorCafe implements Cafe { // (2)
+    protected Cafe cafe;
+
+    DecoradorCafe(Cafe cafe) {
+        this.cafe = cafe;
+    }
+}
+
+class ConLeche extends DecoradorCafe {         // (3)
+    ConLeche(Cafe cafe) { super(cafe); }
+    public int costo() { return cafe.costo() + 1000; }
+}
+
+class ConCanela extends DecoradorCafe {
+    ConCanela(Cafe cafe) { super(cafe); }
+    public int costo() { return cafe.costo() + 500; }
+}
+```
+
+Uso:
+```java
+Cafe pedido = new ConCanela(new ConLeche(new CafeSimple()));  // (4)
+System.out.println(pedido.costo());  // 5000 + 1000 + 500
+```
+
+**Documentación de cada parte:**
+- **(1) `Cafe`**: interfaz del componente base.
+- **(2) `DecoradorCafe`**: clase abstracta que envuelve un `Cafe` y delega la llamada.
+- **(3) `ConLeche`, `ConCanela`**: decoradores concretos que añaden un "extra" antes o después de llamar al método original.
+- **(4)** los decoradores se **apilan** unos sobre otros en tiempo de ejecución.
+
+**Qué puedes cambiar:**
+- Puedes combinar decoradores en cualquier orden y cantidad.
+- Cada decorador nuevo solo necesita extender `DecoradorCafe` y sumar su propia lógica en `costo()` (o el método que decores).
+
+---
+
+## 8. Facade
+
+**Qué resuelve:** ofrecer una interfaz simple que oculta la complejidad de varios subsistemas.
+
+```java
+class Motor {
+    String encender() { return "Motor encendido"; }
+}
+
+class LucesDelanteras {
+    String encender() { return "Luces encendidas"; }
+}
+
+class SistemaAudio {
+    String iniciar() { return "Audio iniciado"; }
+}
+
+class FachadaAuto {                            // (1)
+    private Motor motor = new Motor();
+    private LucesDelanteras luces = new LucesDelanteras();
+    private SistemaAudio audio = new SistemaAudio();
+
+    public String arrancar() {                  // (2)
+        return motor.encender() + " | "
+             + luces.encender() + " | "
+             + audio.iniciar();                 // (3)
+    }
+}
+```
+
+**Documentación de cada parte:**
+- **(1) `FachadaAuto`**: reúne referencias a todos los subsistemas complejos.
+- **(2) `arrancar()`**: único método público que el cliente necesita llamar.
+- **(3)** internamente coordina el orden y la lógica entre subsistemas; el cliente no necesita saberlo.
+
+**Qué puedes cambiar:**
+- Agrega más subsistemas dentro de la fachada sin que el cliente note el cambio.
+- Puedes crear varias fachadas para distintos "modos" (ej: `FachadaAutoDeportivo`).
+
+---
+
+## 9. Observer
+
+**Qué resuelve:** notificar automáticamente a varios objetos ("suscriptores") cuando cambia el estado de otro objeto ("emisor").
+
+```java
+import java.util.ArrayList;
+import java.util.List;
+
+interface Observador {                         // (1)
+    void actualizar(int dato);
+}
+
+class Sujeto {                                 // (2)
+    private List<Observador> observadores = new ArrayList<>();
+
+    public void suscribir(Observador o) {       // (3)
+        observadores.add(o);
+    }
+
+    public void notificar(int dato) {           // (4)
+        for (Observador o : observadores) {
+            o.actualizar(dato);
+        }
+    }
+}
+
+class PantallaTemperatura implements Observador {
+    public void actualizar(int dato) {
+        System.out.println("Pantalla muestra: " + dato + "°C");
+    }
+}
+```
+
+Uso:
+```java
+Sujeto sensor = new Sujeto();
+sensor.suscribir(new PantallaTemperatura());
+sensor.notificar(25);                          // (5)
+```
+
+**Documentación de cada parte:**
+- **(1) `Observador`**: interfaz que todo suscriptor debe implementar.
+- **(2) `Sujeto`**: mantiene la lista de observadores y el estado que cambia.
+- **(3) `suscribir(...)`**: permite registrar nuevos observadores en tiempo de ejecución.
+- **(4) `notificar(...)`**: recorre la lista y avisa a todos cuando hay un cambio.
+- **(5)** al llamar `notificar`, todos los suscriptores reaccionan automáticamente.
+
+**Qué puedes cambiar:**
+- Agrega un método `desuscribir(Observador o)` si necesitas remover observadores (`observadores.remove(o)`).
+- Cada nueva clase que implemente `Observador` reacciona distinto al mismo evento (ej: enviar SMS en vez de mostrar pantalla).
+
+---
+
+## 10. Strategy
+
+**Qué resuelve:** definir una familia de algoritmos intercambiables, seleccionando cuál usar en tiempo de ejecución.
+
+```java
+interface EstrategiaDescuento {                // (1)
+    double calcular(double precio);
+}
+
+class SinDescuento implements EstrategiaDescuento {
+    public double calcular(double precio) { return precio; }
+}
+
+class DescuentoNavidad implements EstrategiaDescuento {
+    public double calcular(double precio) { return precio * 0.8; }
+}
+
+class Carrito {                                // (2)
+    private EstrategiaDescuento estrategia;
+
+    Carrito(EstrategiaDescuento estrategia) {
+        this.estrategia = estrategia;           // (3)
+    }
+
+    public void setEstrategia(EstrategiaDescuento estrategia) {
+        this.estrategia = estrategia;
+    }
+
+    public double total(double precio) {
+        return estrategia.calcular(precio);     // (4)
+    }
+}
+```
+
+Uso:
+```java
+Carrito carrito = new Carrito(new DescuentoNavidad());
+System.out.println(carrito.total(100000));  // 80000
+carrito.setEstrategia(new SinDescuento());   // (5) cambio en tiempo de ejecución
+```
+
+**Documentación de cada parte:**
+- **(1) `EstrategiaDescuento`**: interfaz común para todos los algoritmos intercambiables.
+- **(2) `Carrito`**: la clase "contexto" que usa una estrategia sin conocer sus detalles internos.
+- **(3) `estrategia`**: referencia a la estrategia actual, inyectada por constructor.
+- **(4) `estrategia.calcular(...)`**: el contexto delega el trabajo real a la estrategia activa.
+- **(5)** puedes cambiar la estrategia en cualquier momento con `setEstrategia(...)`.
+
+**Qué puedes cambiar:**
+- Agrega nuevas estrategias creando nuevas clases que implementen `EstrategiaDescuento`, sin tocar `Carrito`.
+- Puedes cambiar la estrategia dinámicamente según condiciones (fecha, tipo de usuario, etc.).
+
+---
+
+## Resumen rápido: cuándo usar cada uno
+
+| Patrón | Úsalo cuando... |
+|---|---|
+| Singleton | necesitas una única instancia global |
+| Factory Method | quieres delegar en subclases qué objeto crear |
+| Abstract Factory | necesitas crear familias completas de objetos coherentes entre sí |
+| Builder | un objeto tiene muchos parámetros opcionales o pasos de construcción |
+| Prototype | clonar es más barato que construir desde cero |
+| Adapter | necesitas conectar código nuevo con código legacy/incompatible |
+| Decorator | quieres añadir comportamiento sin herencia rígida ni tocar la clase original |
+| Facade | quieres esconder la complejidad de varios subsistemas detrás de una interfaz simple |
+| Observer | varios objetos deben reaccionar a un cambio de estado |
+| Strategy | necesitas intercambiar algoritmos en tiempo de ejecución |
