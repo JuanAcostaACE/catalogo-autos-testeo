@@ -1,0 +1,66 @@
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
+
+// ==========================================
+// BLOQUE 1: El Patrón Singleton
+// ==========================================
+public class GestorArchivoXTP {
+    
+    private static volatile GestorArchivoXTP instancia;
+    private final String RUTA_ARCHIVO = "registro_examen.xtp";
+
+    // 1. Constructor privado
+    private GestorArchivoXTP() {
+        System.out.println("Gestor de archivos instanciado por única vez.");
+    }
+
+    // 2. Punto de acceso global con doble verificación
+    public static GestorArchivoXTP getInstancia() {
+        if (instancia == null) {
+            synchronized (GestorArchivoXTP.class) {
+                if (instancia == null) {
+                    instancia = new GestorArchivoXTP();
+                }
+            }
+        }
+        return instancia;
+    }
+
+    // 3. Método de negocio: Guardar el texto en el archivo .xtp
+    public void escribirLinea(String mensaje) {
+        // El 'true' en FileWriter significa modo "append" (añadir al final sin borrar lo anterior)
+        try (BufferedWriter escritor = new BufferedWriter(new FileWriter(RUTA_ARCHIVO, true))) {
+            escritor.write(mensaje);
+            escritor.newLine(); // Salto de línea
+            System.out.println(" Guardado en disco: " + mensaje);
+        } catch (IOException e) {
+            System.out.println(" Error de escritura: " + e.getMessage());
+        }
+    }
+}
+
+// ==========================================
+// BLOQUE 2: El Cliente (Ejecución)
+// ==========================================
+public class MainDemostracion {
+    public static void main(String[] args) {
+        
+        System.out.println("--- INICIANDO SISTEMA ---");
+        
+        // Obtenemos la instancia por primera vez
+        GestorArchivoXTP gestor1 = GestorArchivoXTP.getInstancia();
+        gestor1.escribirLinea("Log 01: El usuario inició sesión.");
+        
+        // Simulamos que estamos en otra parte del programa y necesitamos guardar algo
+        GestorArchivoXTP gestor2 = GestorArchivoXTP.getInstancia();
+        gestor2.escribirLinea("Log 02: Se procesó una compra.");
+        
+        // Prueba de fuego del patrón:
+        System.out.println("\n--- VERIFICACIÓN DEL PATRÓN ---");
+        if (gestor1 == gestor2) {
+            System.out.println("CORRECTO: gestor1 y gestor2 son exactamente el mismo objeto en memoria.");
+            System.out.println("No rompiste el patrón Singleton.");
+        }
+    }
+}
